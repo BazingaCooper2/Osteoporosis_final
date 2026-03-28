@@ -155,11 +155,32 @@
   padding: 3px 10px;
   border-radius: 999px;
 }
-.boneSvg {
-  width: 100%;
-  max-width: 200px;
-  margin: 0 auto var(--space-lg);
-  display: block;
+.scanPreview {
+  position: relative;
+  width: min(65%, 150px);
+  aspect-ratio: 1;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255,255,255,0.14);
+  margin: 0 auto var(--space-md);
+  background: #0b1d32;
+  box-shadow: 0 12px 32px rgba(5,16,30,0.7);
+}
+.scanImageFrame {
+  position: absolute;
+  inset: 10px;
+}
+.scanImage {
+  object-fit: contain;
+  image-rendering: crisp-edges;
+  filter: grayscale(1) contrast(1.25) brightness(1.08);
+}
+.scanCaption {
+  text-align: center;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.65);
+  margin-bottom: var(--space-lg);
 }
 .metricRow {
   display: grid;

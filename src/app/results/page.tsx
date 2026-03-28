@@ -1,26 +1,65 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import type { AnalysisResult } from '@/lib/types';
+import type { AnalysisResult, StoredResult } from '@/lib/types';
 import styles from './page.module.css';
 import Link from 'next/link';
 
 export default function ResultsPage() {
   const router = useRouter();
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [results, setResults] = useState<StoredResult[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('osteoresult');
-    const storedPreview = sessionStorage.getItem('osteopreview');
-    if (!stored) { router.replace('/upload'); return; }
-    setResult(JSON.parse(stored));
-    if (storedPreview) setPreview(storedPreview);
+    const storedBatch = sessionStorage.getItem('osteoresults');
+    if (storedBatch) {
+      try {
+        const parsed: StoredResult[] = JSON.parse(storedBatch);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setResults(parsed);
+          setActiveIndex(0);
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to parse stored batch results', err);
+      }
+    }
+
+    const storedSingle = sessionStorage.getItem('osteoresult');
+    if (storedSingle) {
+      try {
+        const parsed: AnalysisResult = JSON.parse(storedSingle);
+        const storedPreview = sessionStorage.getItem('osteopreview');
+        setResults([
+          {
+            id: 'single-result',
+            fileName: 'Uploaded Scan',
+            preview: storedPreview ?? null,
+            result: parsed,
+          },
+        ]);
+        setActiveIndex(0);
+        return;
+      } catch (err) {
+        console.error('Failed to parse stored result', err);
+      }
+    }
+
+    router.replace('/upload');
   }, [router]);
+
+  useEffect(() => {
+    setShowHeatmap(false);
+  }, [activeIndex]);
+
+  const activeItem = results[activeIndex];
+  const result = activeItem?.result ?? null;
+  const preview = activeItem?.preview ?? null;
 
   const handleExportPdf = async () => {
     if (!result) return;
@@ -89,6 +128,27 @@ export default function ResultsPage() {
           </div>
         </div>
 
+        {results.length > 1 && (
+          <div className={styles.batchSelector} role="tablist" aria-label="Select a result to view">
+            {results.map((item, idx) => {
+              const level = item.result.risk_level as 'low' | 'moderate' | 'high';
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={idx === activeIndex}
+                  className={`${styles.batchChip} ${idx === activeIndex ? styles.batchChipActive : ''}`}
+                  onClick={() => setActiveIndex(idx)}
+                >
+                  <span className={styles.batchName}>{item.fileName}</span>
+                  <span className={styles.batchRisk}>{level.toUpperCase()}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div className={styles.layout}>
           {/* ── LEFT: Summary + Metrics ── */}
           <div className={styles.left}>
@@ -98,6 +158,9 @@ export default function ResultsPage() {
                 <p className={styles.summaryLabel}>Risk Assessment</p>
                 <Badge level={riskLevel} size="lg" />
               </div>
+              {activeItem?.fileName && (
+                <p className={styles.fileLabel}>File: {activeItem.fileName}</p>
+              )}
               <div className={styles.confRow}>
                 <div className={styles.confMeter}>
                   <div
@@ -184,8 +247,15 @@ export default function ResultsPage() {
               </div>
               <div className={styles.heatmapWrap}>
                 {preview ? (
-                  <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-                    <img src={preview} alt="Uploaded scan" className={styles.heatmapImg} />
+                  <div style={{ position: 'relative', width: '100%', minHeight: '360px' }}>
+                    <Image
+                      src={preview}
+                      alt="Uploaded scan"
+                      fill
+                      sizes="(max-width: 768px) 100vw, 420px"
+                      className={styles.heatmapImg}
+                      unoptimized
+                    />
                     {showHeatmap && (
                       <div className={styles.heatmapOverlay} aria-label="Heatmap overlay (illustrative)">
                         <span className={styles.heatmapLabel}>Illustrative overlay</span>

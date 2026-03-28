@@ -79,6 +79,21 @@ export async function exportResultPdf(result: AnalysisResult, imagePreview?: str
   });
   y += 4;
 
+  if (imagePreview) {
+    try {
+      const imgData = await loadImageAsDataUrl(imagePreview);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(14, 27, 44);
+      doc.text('Scan Preview', margin, y);
+      y += 6;
+      doc.addImage(imgData, 'PNG', margin, y, 60, 60, undefined, 'FAST');
+      y += 68;
+    } catch (error) {
+      console.warn('Failed to embed preview image in PDF', error);
+    }
+  }
+
   // ── Interpretation ──
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
@@ -137,4 +152,22 @@ export async function exportResultPdf(result: AnalysisResult, imagePreview?: str
   doc.text(discLines, margin + 4, y + 14);
 
   doc.save(`OsteoScreen_Report_${Date.now()}.pdf`);
+}
+
+async function loadImageAsDataUrl(src: string): Promise<string> {
+  const response = await fetch(src);
+  const blob = await response.blob();
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to convert preview to base64 string.'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Failed to read preview blob.'));
+    reader.readAsDataURL(blob);
+  });
 }

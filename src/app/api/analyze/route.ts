@@ -12,10 +12,12 @@ const RISK_LEVEL_MAP: Record<string, 'low' | 'moderate' | 'high'> = {
   'Osteoporosis': 'high'
 };
 
+type PythonRawResult = Record<string, unknown>;
+
 const DEFAULT_MODEL_DIR = join(process.cwd(), 'Direct_Models', 'models_improved');
 const FALLBACK_MODEL_DIR = join(process.cwd(), 'models');
 
-async function runPythonInference(imagePath: string): Promise<any> {
+async function runPythonInference(imagePath: string): Promise<PythonRawResult> {
   const scriptPath = join(process.cwd(), 'scripts', 'inference.py');
   const defaultPython = join(process.cwd(), '.venv', 'bin', 'python');
   const pythonExecutable = process.env.PYTHON_BIN || (existsSync(defaultPython) ? defaultPython : 'python3');
@@ -58,7 +60,7 @@ async function runPythonInference(imagePath: string): Promise<any> {
   });
 }
 
-function getInterpretations(level: string, tScore: number) {
+function getInterpretations(level: string) {
   const meta: Record<string, { interpretation: string, nextSteps: string[] }> = {
     low: {
       interpretation: 'Bone mineral density appears within normal range. Continued routine screening is recommended per age-appropriate guidelines.',
@@ -127,7 +129,7 @@ export async function POST(request: NextRequest) {
     const recText = typeof rawResult?.recommendation === 'string' ? rawResult.recommendation : '';
     const recLines = recText.split(/\n+/).map((s: string) => s.trim()).filter(Boolean);
 
-    const meta = getInterpretations(riskLevel, tScore);
+    const meta = getInterpretations(riskLevel);
     const interpretation = recLines[0] || meta.interpretation;
     const nextSteps = recLines.length > 1 ? recLines.slice(1) : meta.nextSteps;
 

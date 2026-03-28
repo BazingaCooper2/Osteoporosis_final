@@ -1,112 +1,205 @@
 'use client';
-import { useState, useCallback } from 'react';
+
+import { useCallback, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import FileUpload from '@/components/ui/FileUpload';
-import ProgressBar from '@/components/ui/ProgressBar';
+import FileUpload, { UploadFile } from '@/components/ui/FileUpload';
 import Button from '@/components/ui/Button';
+import ProgressBar from '@/components/ui/ProgressBar';
+import type { AnalysisResult, InferenceState, StoredResult } from '@/lib/types';
 import styles from './page.module.css';
-import type { InferenceState, UploadedFile, AnalysisResult } from '@/lib/types';
+
+type JobStatus = 'pending' | 'processing' | 'success' | 'error';
+
+interface Job extends UploadFile {
+  id: string;
+  status: JobStatus;
+  error?: string;
+}
+
+const STAGE_FLOW: InferenceState[] = ['idle', 'validating', 'uploading', 'running', 'completed'];
 
 const STAGE_LABELS: Record<InferenceState, string> = {
-  idle:       'Awaiting image upload',
-  validating: 'Validating image format and size…',
-  uploading:  'Sending image to analysis server…',
-  running:    'Running AI inference model…',
-  completed:  'Analysis complete',
-  error:      'An error occurred',
+  idle: 'Waiting to start',
+  validating: 'Validating images',
+  uploading: 'Uploading to server',
+  running: 'Running inference',
+  completed: 'Complete',
 };
+
 const STAGE_PROGRESS: Record<InferenceState, number> = {
-  idle: 0, validating: 15, uploading: 40, running: 75, completed: 100, error: 0,
+  idle: 0,
+  validating: 20,
+  uploading: 45,
+  running: 80,
+  completed: 100,
+};
+
+const STATUS_LABEL: Record<JobStatus, string> = {
+  pending: 'Queued',
+  processing: 'Processing',
+  success: 'Ready',
+  error: 'Error',
 };
 
 export default function UploadPage() {
   const router = useRouter();
-  const [state, setState] = useState<InferenceState>('idle');
-  const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [log, setLog] = useState<string[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [batchError, setBatchError] = useState<string | null>(null);
+  const [stage, setStage] = useState<InferenceState>('idle');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
-  const pushLog = (msg: string) =>
-    setLog((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
-
-  const handleFileSelected = useCallback((f: UploadedFile) => {
-    setUploadedFile(f);
-    setError(null);
-    setLog([]);
-    setState('idle');
+  const pushLog = useCallback((message: string) => {
+    setLogs((prev) => {
+      const entry = `${new Date().toLocaleTimeString()} — ${message}`;
+      return [...prev.slice(-80), entry];
+    });
   }, []);
 
-  const handleError = useCallback((msg: string) => {
-    setError(msg);
-    setState('error');
-    pushLog(`Error: ${msg}`);
-  }, []);
-
-  const runInference = useCallback(async () => {
-    if (!uploadedFile) return;
-    setError(null);
-
-    // Validate
-    setState('validating');
-    pushLog('Validating file type and size…');
-    await delay(600);
-    pushLog(`File accepted: ${uploadedFile.file.name} (${uploadedFile.sizeStr})`);
-
-    // Upload
-    setState('uploading');
-    pushLog('Transmitting image securely…');
-    await delay(800);
-
-    // Inference
-    setState('running');
-    pushLog('Initialising bone density model v1.4.2-beta…');
-    await delay(400);
-    pushLog('Extracting morphological features…');
-    await delay(600);
-    pushLog('Computing T-score proxy…');
-    await delay(500);
-
-    try {
-      const formData = new FormData();
-      formData.append('image', uploadedFile.file);
-      const res = await fetch('/api/analyze', { method: 'POST', body: formData });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? 'Inference failed.');
-      }
-
-      const result: AnalysisResult = await res.json();
-      pushLog(`Risk classification: ${result.risk_level.toUpperCase()} (confidence ${(result.confidence * 100).toFixed(1)}%)`);
-      pushLog('Analysis complete. Preparing report…');
-      setState('completed');
-
-      // Store result in sessionStorage and navigate
-      sessionStorage.setItem('osteoresult', JSON.stringify(result));
-      sessionStorage.setItem('osteopreview', uploadedFile.preview);
-      await delay(800);
-      router.push('/results');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unexpected inference error.';
-      setState('error');
-      setError(msg);
-      pushLog(`Error: ${msg}`);
+  const safeRevoke = useCallback((url?: string | null) => {
+    if (url && url.startsWith('blob:')) {
+      URL.revokeObjectURL(url);
     }
-  }, [uploadedFile, router]);
+  }, []);
 
-  const reset = () => {
-    setUploadedFile(null);
-    setState('idle');
-    setError(null);
-    setLog([]);
-  };
+  const updateJob = useCallback((id: string, data: Partial<Job>) => {
+    setJobs((prev) => prev.map((job) => (job.id === id ? { ...job, ...data } : job)));
+  }, []);
 
-  const isRunning = ['validating', 'uploading', 'running'].includes(state);
+  const handleFileSelected = useCallback(
+    (upload: UploadFile) => {
+      setBatchError(null);
+      setJobs((prev) => [
+        ...prev,
+        {
+          ...upload,
+          id: generateJobId(),
+          status: 'pending',
+          error: undefined,
+        },
+      ]);
+      pushLog(`Queued ${upload.file.name}`);
+    },
+    [pushLog]
+  );
+
+  const handleUploadError = useCallback(
+    (msg: string) => {
+      setBatchError(msg);
+      pushLog(`Upload error: ${msg}`);
+    },
+    [pushLog]
+  );
+
+  const removeJob = useCallback(
+    (id: string) => {
+      setJobs((prev) => {
+        const job = prev.find((item) => item.id === id);
+        safeRevoke(job?.preview);
+        return prev.filter((item) => item.id !== id);
+      });
+    },
+    [safeRevoke]
+  );
+
+  const clearJobs = useCallback(() => {
+    setJobs((prev) => {
+      prev.forEach((job) => safeRevoke(job.preview));
+      return [];
+    });
+    setBatchError(null);
+    setLogs([]);
+    setStage('idle');
+  }, [safeRevoke]);
+
+  const runBatchInference = useCallback(async () => {
+    if (jobs.length === 0 || isProcessing) return;
+
+    setBatchError(null);
+    setIsProcessing(true);
+    setStage('validating');
+    setLogs([]);
+
+    const collected: StoredResult[] = [];
+
+    for (const job of jobs) {
+      setCurrentJobId(job.id);
+      updateJob(job.id, { status: 'processing', error: undefined });
+      const prefix = `[${job.file.name}]`;
+
+      try {
+        pushLog(`${prefix} Validating image…`);
+        setStage('validating');
+
+        const formData = new FormData();
+        formData.append('image', job.file);
+
+        setStage('uploading');
+        pushLog(`${prefix} Uploading to inference service…`);
+
+        setStage('running');
+        pushLog(`${prefix} Running inference…`);
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          let errorMessage = `Service returned ${response.status}`;
+          try {
+            const errJson = await response.json();
+            if (errJson?.error) errorMessage = errJson.error;
+          } catch {
+            /* no-op */
+          }
+          throw new Error(errorMessage);
+        }
+
+        const result = (await response.json()) as AnalysisResult;
+        updateJob(job.id, { status: 'success' });
+        collected.push({ id: job.id, fileName: job.file.name, preview: job.preview, result });
+        pushLog(`${prefix} Analysis complete.`);
+        setStage('running');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unexpected inference error.';
+        updateJob(job.id, { status: 'error', error: message });
+        pushLog(`${prefix} Error: ${message}`);
+      }
+    }
+
+    if (collected.length) {
+      setStage('completed');
+      sessionStorage.setItem('osteoresults', JSON.stringify(collected));
+      sessionStorage.removeItem('osteoresult');
+      sessionStorage.removeItem('osteopreview');
+      router.push('/results');
+    } else {
+      setBatchError('All analyses failed. Please review the errors and try again.');
+      setStage('idle');
+    }
+
+    setIsProcessing(false);
+    setCurrentJobId(null);
+  }, [jobs, isProcessing, pushLog, router, updateJob]);
+
+  const totalJobs = jobs.length;
+  const currentJobIndex = currentJobId ? jobs.findIndex((job) => job.id === currentJobId) : -1;
+  const currentJobName = currentJobIndex >= 0 ? jobs[currentJobIndex].file.name : null;
+  const baseLabel = stage === 'idle' && totalJobs > 0 ? 'Ready to run batch' : STAGE_LABELS[stage];
+  const progressLabel = currentJobName && totalJobs > 1
+    ? `${baseLabel} • ${currentJobIndex + 1}/${totalJobs}`
+    : baseLabel;
+
+  const isRunning = useMemo(
+    () => isProcessing && ['validating', 'uploading', 'running'].includes(stage),
+    [isProcessing, stage]
+  );
 
   return (
     <div className={styles.page}>
       <div className="container">
-        {/* Page header */}
         <div className={styles.pageHeader}>
           <h1 className={styles.title}>Image Analysis</h1>
           <p className={styles.sub}>
@@ -116,44 +209,72 @@ export default function UploadPage() {
         </div>
 
         <div className={styles.layout}>
-          {/* ── Left: Upload + Run ── */}
           <div className={styles.left}>
             <div className={styles.card}>
-              <h2 className={styles.cardTitle}>Upload Medical Image</h2>
+              <h2 className={styles.cardTitle}>Upload queue</h2>
               <FileUpload
                 onFileSelected={handleFileSelected}
-                onError={handleError}
-                disabled={isRunning}
+                onError={handleUploadError}
+                disabled={isProcessing}
+                allowMultiple
               />
 
-              {/* File preview */}
-              {uploadedFile && (
-                <div className={styles.preview}>
-                  <img
-                    src={uploadedFile.preview}
-                    alt="Uploaded scan preview"
-                    className={styles.previewImg}
-                  />
-                  <div className={styles.previewMeta}>
-                    <span className={styles.fileName}>{uploadedFile.file.name}</span>
-                    <span className={styles.fileSize}>{uploadedFile.sizeStr}</span>
-                  </div>
-                  {!isRunning && state !== 'completed' && (
-                    <button onClick={reset} className={styles.removeBtn} aria-label="Remove file">
-                      ✕ Remove
-                    </button>
-                  )}
+              {batchError && (
+                <div className={styles.errorBox} role="alert">
+                  <strong>Batch error:</strong>
+                  <span>{batchError}</span>
                 </div>
               )}
 
-              {/* Error */}
-              {error && (
-                <div className={styles.errorBox} role="alert" aria-live="assertive">
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                    <circle cx="9" cy="9" r="8" stroke="var(--color-coral)" strokeWidth="1.5"/>
-                    <path d="M9 5v5M9 12.5v1" stroke="var(--color-coral)" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                  <span>{error}</span>
+              <div className={styles.queueHeader}>
+                <span>{totalJobs} file{totalJobs === 1 ? '' : 's'} queued</span>
+                <button
+                  type="button"
+                  className={styles.clearBtn}
+                  onClick={clearJobs}
+                  disabled={!totalJobs || isProcessing}
+                >
+                  Clear queue
+                </button>
+              </div>
+
+              {totalJobs === 0 ? (
+                <p className={styles.queueEmpty}>No files queued yet. Drop images above to begin.</p>
+              ) : (
+                <div className={styles.previewList}>
+                  {jobs.map((job) => {
+                    const statusClass = styles[`status-${job.status}` as keyof typeof styles] ?? '';
+                    return (
+                      <div key={job.id} className={styles.preview}>
+                        <Image
+                          src={job.preview}
+                          width={52}
+                          height={52}
+                          alt={`${job.file.name} preview`}
+                          className={styles.previewImg}
+                          unoptimized
+                        />
+                        <div className={styles.previewMeta}>
+                          <span className={styles.fileName}>{job.file.name}</span>
+                          <span className={styles.fileSize}>{job.sizeStr}</span>
+                          {job.error && <span className={styles.jobError}>{job.error}</span>}
+                        </div>
+                        <span className={[styles.statusBadge, statusClass].join(' ')}>
+                          {STATUS_LABEL[job.status]}
+                        </span>
+                        {!isProcessing && (
+                          <button
+                            type="button"
+                            onClick={() => removeJob(job.id)}
+                            className={styles.removeBtn}
+                            aria-label={`Remove ${job.file.name}`}
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -161,66 +282,74 @@ export default function UploadPage() {
                 variant="primary"
                 size="lg"
                 fullWidth
-                disabled={!uploadedFile || isRunning}
-                loading={isRunning}
-                onClick={runInference}
-                aria-label="Run analysis on uploaded image"
+                disabled={!totalJobs || isProcessing}
+                loading={isProcessing}
+                onClick={runBatchInference}
+                aria-label="Run analysis on queued images"
               >
-                {isRunning ? 'Analysing…' : 'Run Analysis →'}
+                {isProcessing ? 'Analysing batch…' : 'Run Batch Analysis →'}
               </Button>
             </div>
           </div>
 
-          {/* ── Right: Progress + Log ── */}
           <div className={styles.right}>
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Inference Status</h2>
+              {currentJobName && isRunning && (
+                <p className={styles.currentJob}>
+                  Processing {currentJobName}
+                  {totalJobs > 1 && currentJobIndex >= 0 ? ` (${currentJobIndex + 1}/${totalJobs})` : ''}
+                </p>
+              )}
 
-              {/* Stage indicator */}
               <div className={styles.stageList} role="list" aria-label="Inference stages">
-                {(['validating', 'uploading', 'running', 'completed'] as InferenceState[]).map((s) => {
-                  const stageIndex = ['validating','uploading','running','completed'].indexOf(s);
-                  const currentIndex = ['idle','validating','uploading','running','completed','error'].indexOf(state);
-                  const isDone  = currentIndex > stageIndex + 1;
-                  const isNow   = state === s;
+                {STAGE_FLOW.map((flowStage) => {
+                  const stageIndex = STAGE_FLOW.indexOf(flowStage);
+                  const currentIndex = STAGE_FLOW.indexOf(stage);
+                  const isDone = currentIndex > stageIndex;
+                  const isNow = stage === flowStage;
                   return (
-                    <div key={s}
-                      className={[styles.stageItem, isDone ? styles.stageDone : '', isNow ? styles.stageActive : ''].join(' ')}
+                    <div
+                      key={flowStage}
+                      className={[
+                        styles.stageItem,
+                        isDone ? styles.stageDone : '',
+                        isNow ? styles.stageActive : '',
+                      ].join(' ')}
                       role="listitem"
                       aria-current={isNow ? 'step' : undefined}
                     >
                       <span className={styles.stageDot} aria-hidden="true">
                         {isDone ? '✓' : isNow ? '●' : '○'}
                       </span>
-                      <span className={styles.stageLabel}>{STAGE_LABELS[s]}</span>
+                      <span className={styles.stageLabel}>{STAGE_LABELS[flowStage]}</span>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Progress bar */}
               <div className={styles.progressWrap}>
                 <ProgressBar
-                  progress={STAGE_PROGRESS[state]}
-                  label={STAGE_LABELS[state]}
-                  animated={isRunning}
-                  variant={state === 'error' ? 'danger' : state === 'completed' ? 'success' : 'default'}
+                  progress={STAGE_PROGRESS[stage]}
+                  label={progressLabel}
+                  animated={isProcessing}
+                  variant={stage === 'completed' ? 'success' : 'default'}
                 />
               </div>
 
-              {/* Log panel */}
               <div className={styles.logPanel} aria-label="Inference log" aria-live="polite">
-                {log.length === 0 ? (
+                {logs.length === 0 ? (
                   <p className={styles.logEmpty}>Logs will appear here once you start an analysis.</p>
                 ) : (
-                  log.map((entry, i) => (
-                    <p key={i} className={styles.logEntry}>{entry}</p>
+                  logs.map((entry, idx) => (
+                    <p key={`${entry}-${idx}`} className={styles.logEntry}>
+                      {entry}
+                    </p>
                   ))
                 )}
               </div>
             </div>
 
-            {/* Disclaimer card */}
             <div className={`${styles.card} ${styles.disclaimerCard}`}>
               <p className={styles.disclaimerTitle}>⚠ Important Notice</p>
               <p className={styles.disclaimerText}>
@@ -229,7 +358,7 @@ export default function UploadPage() {
                 making any medical decisions.
               </p>
               <p className={styles.disclaimerText} style={{ marginTop: '0.5rem' }}>
-                Images are processed securely and are <strong>not stored</strong> beyond the current session.
+                Images are processed during your session and are <strong>not stored</strong> beyond completion of the analysis.
               </p>
             </div>
           </div>
@@ -239,6 +368,9 @@ export default function UploadPage() {
   );
 }
 
-function delay(ms: number) {
-  return new Promise((res) => setTimeout(res, ms));
+function generateJobId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `job-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }

@@ -50,10 +50,43 @@
   color: var(--color-navy);
 }
 
+.queueHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--color-gray-500);
+  width: 100%;
+}
+.queueEmpty {
+  font-size: 0.85rem;
+  color: var(--color-gray-400);
+  background: var(--color-gray-50);
+  border: 1px dashed var(--color-gray-200);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+}
+.clearBtn {
+  background: none;
+  border: none;
+  color: var(--color-coral);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.previewList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
 /* ── Preview ── */
 .preview {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-md);
   background: var(--color-gray-100);
   border: 1px solid var(--color-gray-200);
@@ -85,6 +118,11 @@
   font-size: 0.75rem;
   color: var(--color-gray-400);
 }
+.jobError {
+  font-size: 0.75rem;
+  color: var(--color-coral-dark);
+  margin-top: 2px;
+}
 .removeBtn {
   font-size: 0.75rem;
   color: var(--color-coral);
@@ -96,6 +134,21 @@
   transition: opacity var(--transition-fast);
 }
 .removeBtn:hover { opacity: 0.7; }
+
+.statusBadge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-radius: 999px;
+  padding: 2px 10px;
+  border: 1px solid currentColor;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.status-pending { color: var(--color-gray-500); }
+.status-processing { color: var(--color-teal); }
+.status-success { color: var(--color-success); }
+.status-error { color: var(--color-coral-dark); }
 
 /* ── Error ── */
 .errorBox {
@@ -136,6 +189,12 @@
 .stageLabel { flex: 1; }
 
 .progressWrap { margin-top: var(--space-sm); }
+
+.currentJob {
+  font-size: 0.82rem;
+  color: var(--color-gray-600);
+  margin-bottom: var(--space-sm);
+}
 
 /* ── Log Panel ── */
 .logPanel {

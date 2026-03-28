@@ -17,9 +17,10 @@ interface FileUploadProps {
   onFileSelected: (f: UploadFile) => void;
   onError: (msg: string) => void;
   disabled?: boolean;
+  allowMultiple?: boolean;
 }
 
-export default function FileUpload({ onFileSelected, onError, disabled }: FileUploadProps) {
+export default function FileUpload({ onFileSelected, onError, disabled, allowMultiple = false }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -50,22 +51,32 @@ export default function FileUpload({ onFileSelected, onError, disabled }: FileUp
     [validate, onFileSelected, onError]
   );
 
-  const onDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-      const file = e.dataTransfer.files?.[0];
-      if (file) handleFile(file);
+  const processFileList = useCallback(
+    (fileList: FileList | null) => {
+      if (!fileList) return;
+      Array.from(fileList).forEach((file) => handleFile(file));
     },
     [handleFile]
   );
 
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      if (disabled) return;
+      processFileList(e.dataTransfer.files);
+    },
+    [disabled, processFileList]
+  );
+
   const onInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) handleFile(file);
+      processFileList(e.target.files);
+      if (inputRef.current) {
+        inputRef.current.value = '';
+      }
     },
-    [handleFile]
+    [processFileList]
   );
 
   return (
@@ -75,7 +86,7 @@ export default function FileUpload({ onFileSelected, onError, disabled }: FileUp
         .join(' ')}
       onDragOver={(e) => { e.preventDefault(); if (!disabled) setIsDragging(true); }}
       onDragLeave={() => setIsDragging(false)}
-      onDrop={disabled ? undefined : onDrop}
+      onDrop={onDrop}
       role="button"
       tabIndex={disabled ? -1 : 0}
       aria-label="Drop zone: upload a medical image"
@@ -85,6 +96,7 @@ export default function FileUpload({ onFileSelected, onError, disabled }: FileUp
         ref={inputRef}
         type="file"
         accept=".png,.jpg,.jpeg"
+        multiple={allowMultiple}
         className={styles.hiddenInput}
         onChange={onInputChange}
         aria-label="File input"

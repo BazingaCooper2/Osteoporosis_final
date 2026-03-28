@@ -89,7 +89,7 @@ export default function InsightsPage() {
               <p>
                 Osteoporosis is a systemic skeletal disease characterised by reduced bone mineral density (BMD)
                 and deterioration of bone microarchitecture, leading to increased bone fragility and susceptibility
-                to fracture. It is often called a <strong>"silent disease"</strong> because bone loss occurs
+                to fracture. It is often called a <strong>&ldquo;silent disease&rdquo;</strong> because bone loss occurs
                 without symptoms until a fracture occurs.
               </p>
               <p>

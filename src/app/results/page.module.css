@@ -34,6 +34,44 @@
 }
 .headerActions { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; }
 
+.batchSelector {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-xl);
+}
+.batchChip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.batchChip:focus-visible {
+  outline: 2px solid var(--color-teal);
+  outline-offset: 2px;
+}
+.batchChipActive {
+  border-color: var(--color-teal);
+  box-shadow: 0 6px 18px rgba(28,156,167,0.18);
+}
+.batchName {
+  font-weight: 600;
+  color: var(--color-navy);
+}
+.batchRisk {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-gray-500);
+}
+
 /* Layout */
 .layout {
   display: grid;
@@ -77,6 +115,11 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 600;
+}
+.fileLabel {
+  font-size: 0.78rem;
+  color: var(--color-gray-500);
+  margin-bottom: var(--space-sm);
 }
 .confRow {
   display: flex;

@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import styles from './page.module.css';
 
@@ -5,7 +6,7 @@ const HOW_IT_WORKS = [
   {
     step: '01',
     title: 'Upload Your Image',
-    desc: 'Securely upload a DXA scan or X-ray. PNG and JPG formats are supported. Images are processed in-session only and are not stored.',
+    desc: 'Upload a DXA scan or X-ray. PNG and JPG formats are supported. Images are processed in-session only and are not stored.',
   },
   {
     step: '02',
@@ -23,7 +24,7 @@ const STATS = [
   { value: 'WHO', label: 'Classification Standard' },
   { value: 'T-Score', label: 'BMD Metric' },
   { value: '20 MB', label: 'Max Image Size' },
-  { value: 'AES-256', label: 'In-Transit Encryption' },
+  { value: 'Session Only', label: 'Processing Scope' },
 ];
 
 export default function HomePage() {
@@ -66,25 +67,25 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className={styles.heroGraphic} aria-hidden="true">
-            <div className={styles.boneCard}>
+          <div className={styles.heroGraphic}>
+            <div className={styles.boneCard} aria-label="Sample risk report preview">
               <div className={styles.boneCardHeader}>
                 <span className={styles.boneCardTitle}>Sample Analysis</span>
                 <span className={styles.boneCardBadge}>Moderate Risk</span>
               </div>
-              <svg className={styles.boneSvg} viewBox="0 0 200 260" fill="none">
-                {/* Stylized femur/spine bone graphic */}
-                <ellipse cx="100" cy="40" rx="35" ry="30" fill="#1C9CA7" opacity="0.15" stroke="#1C9CA7" strokeWidth="1.5"/>
-                <rect x="82" y="68" width="36" height="130" rx="18" fill="#1C9CA7" opacity="0.12" stroke="#1C9CA7" strokeWidth="1.5"/>
-                <ellipse cx="100" cy="200" rx="40" ry="32" fill="#1C9CA7" opacity="0.15" stroke="#1C9CA7" strokeWidth="1.5"/>
-                {/* BMD density dots */}
-                {[60,80,100,120,140,160].map((y,i) => (
-                  <circle key={i} cx={90 + (i%3)*8} cy={y} r="2.5" fill="#1C9CA7" opacity={0.3 + i*0.1}/>
-                ))}
-                {/* Highlight area */}
-                <rect x="86" y="100" width="28" height="50" rx="6" fill="#EE6A5F" opacity="0.2"/>
-                <rect x="86" y="100" width="28" height="50" rx="6" stroke="#EE6A5F" strokeWidth="1.5" strokeDasharray="4 2"/>
-              </svg>
+              <div className={styles.scanPreview}>
+                <div className={styles.scanImageFrame}>
+                  <Image
+                    src="/images/hero-scan.png"
+                    alt="De-identified DXA-style scan preview"
+                    fill
+                    className={styles.scanImage}
+                    sizes="(max-width: 640px) 90px, 140px"
+                    priority
+                  />
+                </div>
+              </div>
+              <p className={styles.scanCaption}>Illustrative DXA-style snippet</p>
               <div className={styles.metricRow}>
                 <div className={styles.metric}>
                   <span className={styles.metricVal}>-1.8</span>

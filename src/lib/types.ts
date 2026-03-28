@@ -19,11 +19,17 @@ export type InferenceState =
   | 'validating'
   | 'uploading'
   | 'running'
-  | 'completed'
-  | 'error';
+  | 'completed';
 
 export interface UploadedFile {
   file: File;
   preview: string;
   sizeStr: string;
+}
+
+export interface StoredResult {
+  id: string;
+  fileName: string;
+  preview: string | null;
+  result: AnalysisResult;
 }

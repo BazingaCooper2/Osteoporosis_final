@@ -2,9 +2,9 @@ import styles from './page.module.css';
 import Link from 'next/link';
 
 const INTENDED_USES = [
-  'Screening support for bone health clinics',
-  'Educational research and model benchmarking',
-  'Pre-referral triage tool (not for definitive diagnosis)',
+  'Engineering evaluation of the OsteoScreen prototype pipeline',
+  'Educational walkthroughs and model benchmarking with de-identified scans',
+  'Research triage experiments under clinician oversight (not diagnostic)',
 ];
 
 const LIMITATIONS = [
@@ -29,7 +29,7 @@ export default function AboutPage() {
         <div className={styles.pageHeader}>
           <div className={styles.headerMeta}>
             <span className={styles.docType}>Model Card</span>
-            <span className={styles.version}>Model v1.4.2-beta · Last updated March 2026</span>
+            <span className={styles.version}>Research prototype · Updated from main branch build</span>
           </div>
           <h1 className={styles.title}>About OsteoScreen</h1>
           <p className={styles.sub}>
@@ -45,13 +45,13 @@ export default function AboutPage() {
               <div className={styles.card}>
                 <table className={styles.overviewTable}>
                   <tbody>
-                    <tr><td>Model Name</td><td>OsteoScreen v1.4.2-beta</td></tr>
-                    <tr><td>Task</td><td>Binary/ternary bone mineral density risk classification from 2D radiographic images</td></tr>
-                    <tr><td>Architecture</td><td>Convolutional neural network (ResNet-50 backbone + custom BMD regression head)</td></tr>
-                    <tr><td>Input</td><td>PNG or JPEG radiographic image (≥ 96 DPI, ≤ 20 MB)</td></tr>
+                    <tr><td>Model Name</td><td>OsteoScreen research prototype</td></tr>
+                    <tr><td>Task</td><td>Image-based osteoporosis risk stratification from DXA or X-ray uploads</td></tr>
+                    <tr><td>Architecture</td><td>PyTorch CNN with regression and classification heads (ResNet-style backbone)</td></tr>
+                    <tr><td>Input</td><td>PNG or JPEG radiograph (≤ 20 MB; ≥ 96 DPI recommended)</td></tr>
                     <tr><td>Output</td><td>Risk label (Low/Moderate/High), confidence score, T-score proxy, BMD estimate</td></tr>
-                    <tr><td>Last Training Update</td><td>December 2025</td></tr>
-                    <tr><td>Regulatory Status</td><td>Investigational use only — not FDA 510(k) cleared or CE marked</td></tr>
+                    <tr><td>Training Snapshot</td><td>Ships with weights from Direct_Models/models_improved; raw data not included</td></tr>
+                    <tr><td>Regulatory Status</td><td>Investigational use only — not cleared for clinical deployment</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -62,18 +62,18 @@ export default function AboutPage() {
               <h2 id="data-title" className={styles.cardTitle}>Training Data</h2>
               <div className={styles.card}>
                 <p className={styles.cardText}>
-                  The model was trained on a retrospective, de-identified dataset of DXA scan and radiograph images
-                  derived from multiple academic clinical sites. Ground-truth labels were established from contemporaneous
-                  DXA T-score measurements at the femoral neck and lumbar spine per WHO criteria.
+                  This repository distributes pretrained checkpoints only. They originate from internal experiments
+                  on de-identified DXA-style scans, and the raw datasets are intentionally excluded. To retrain or
+                  validate the model, you will need to supply your own compliant data sources.
                 </p>
                 <ul className={styles.dataList}>
-                  <li><strong>Cohort size:</strong> ~42,000 study scans across training, validation, and test splits</li>
-                  <li><strong>Demographics:</strong> Ages 40–85; 68% female; predominantly North American and European sites</li>
-                  <li><strong>Scanner brands:</strong> Hologic, GE Lunar (primary); Norland (limited)</li>
-                  <li><strong>Exclusions:</strong> Pediatric patients, implant-present scans, image quality score &lt; 2</li>
+                  <li><strong>Data availability:</strong> Model weights live under Direct_Models/models_improved; sample images are not bundled.</li>
+                  <li><strong>Label source:</strong> Risk classes and T-score proxies come from the metadata used during training.</li>
+                  <li><strong>Adaptation:</strong> Retraining requires institution-specific datasets that reflect your scanners and populations.</li>
+                  <li><strong>Governance:</strong> Ensure any uploaded data is de-identified and approved under your local privacy process.</li>
                 </ul>
                 <p className={styles.cardSubnote}>
-                  Data sourced under IRB-approved protocols. No patient-identifiable information was retained.
+                  No PHI ships with this project. When incorporating patient data, follow your organization&apos;s IRB/ethics guidance and applicable privacy laws.
                 </p>
               </div>
             </section>

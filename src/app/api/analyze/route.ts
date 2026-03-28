@@ -120,7 +120,8 @@ export async function POST(request: NextRequest) {
     tempFilePath = null;
 
     const riskLevelFromPy = typeof rawResult?.risk_level === 'string' ? rawResult.risk_level.toLowerCase() : undefined;
-    const riskLevel = (riskLevelFromPy as 'low' | 'moderate' | 'high' | undefined) || RISK_LEVEL_MAP[rawResult?.prediction] || 'low';
+    const prediction = typeof rawResult?.prediction === 'string' ? rawResult.prediction : undefined;
+    const riskLevel = (riskLevelFromPy as 'low' | 'moderate' | 'high' | undefined) || (prediction ? RISK_LEVEL_MAP[prediction] : undefined) || 'low';
 
     const confidence = typeof rawResult?.confidence === 'number' ? rawResult.confidence : Number(rawResult?.confidence ?? 0);
     const whoClassification = rawResult?.predicted_label || rawResult?.prediction || 'Normal';
@@ -133,7 +134,13 @@ export async function POST(request: NextRequest) {
     const interpretation = recLines[0] || meta.interpretation;
     const nextSteps = recLines.length > 1 ? recLines.slice(1) : meta.nextSteps;
 
-    const modelVersion = rawResult?.config_used?.pipeline_version || rawResult?.config_used?.model_version || '2.0.0-integrated';
+    const configUsed = typeof rawResult?.config_used === 'object' && rawResult.config_used !== null
+      ? (rawResult.config_used as Record<string, unknown>)
+      : undefined;
+    const modelVersion =
+      (typeof configUsed?.pipeline_version === 'string' ? configUsed.pipeline_version : undefined) ||
+      (typeof configUsed?.model_version === 'string' ? configUsed.model_version : undefined) ||
+      '2.0.0-integrated';
     const bmdEstimate = parseFloat((0.85 - (tScore * -0.1)).toFixed(3));
 
     const translatedResult = {

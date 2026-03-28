@@ -1,0 +1,102 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--color-navy);
+  border-bottom: 1px solid var(--color-navy-light);
+  backdrop-filter: blur(8px);
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-white);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.brand:hover { color: var(--color-teal-light); }
+
+.logo {
+  color: var(--color-teal-light);
+}
+
+.brandName {
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brandTag {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--color-teal-light);
+  background: rgba(28, 156, 167, 0.15);
+  border: 1px solid rgba(28, 156, 167, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nav { margin-left: auto; }
+
+.navList {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  list-style: none;
+}
+
+.navLink {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  transition: color var(--transition-fast), background var(--transition-fast);
+  text-decoration: none;
+}
+
+.navLink:hover {
+  color: var(--color-white);
+  background: rgba(255,255,255,0.07);
+}
+
+.navLink.active {
+  color: var(--color-teal-light);
+  background: rgba(28, 156, 167, 0.12);
+}
+
+.ctaBtn {
+  flex-shrink: 0;
+  background: var(--color-teal);
+  color: var(--color-white);
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  white-space: nowrap;
+}
+.ctaBtn:hover {
+  background: var(--color-teal-dark);
+  color: var(--color-white);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .navList { display: none; }
+  .brandTag { display: none; }
+}

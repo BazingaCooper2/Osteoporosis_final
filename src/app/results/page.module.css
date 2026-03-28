@@ -1,0 +1,317 @@
+.page { padding: var(--space-xl) 0 var(--space-3xl); }
+
+/* Breadcrumb */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.8rem;
+  color: var(--color-gray-400);
+  margin-bottom: var(--space-xl);
+}
+.breadcrumb a { color: var(--color-gray-400); text-decoration: none; }
+.breadcrumb a:hover { color: var(--color-teal); }
+.breadcrumb span[aria-current] { color: var(--color-navy); font-weight: 600; }
+
+/* Page header */
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-2xl);
+  flex-wrap: wrap;
+}
+.title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--color-navy);
+}
+.processedAt {
+  font-size: 0.78rem;
+  color: var(--color-gray-400);
+  margin-top: var(--space-xs);
+}
+.headerActions { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; }
+
+/* Layout */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: var(--space-xl);
+  align-items: start;
+}
+.left, .right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* Card base */
+.card {
+  background: var(--color-white);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-sm);
+  animation: fadeInUp 0.45s ease both;
+}
+.cardTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-navy);
+  margin-bottom: var(--space-md);
+}
+
+/* Summary */
+.summaryCard { border-left: 4px solid var(--color-teal); }
+.summaryTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+.summaryLabel {
+  font-size: 0.75rem;
+  color: var(--color-gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.confRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.confMeter {
+  flex: 1;
+  height: 6px;
+  background: var(--color-gray-200);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.confFill {
+  height: 100%;
+  background: var(--color-teal);
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+.confLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-teal);
+  white-space: nowrap;
+}
+.interpretation {
+  font-size: 0.9rem;
+  color: var(--color-gray-600);
+  line-height: 1.7;
+}
+
+/* Metrics table */
+.metricsTable { width: 100%; border-collapse: collapse; }
+.metricsTable td {
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--color-gray-100);
+}
+.metricsTable td:first-child { color: var(--color-gray-600); }
+.metricsTable td:last-child { text-align: right; }
+.metricsTable tr:last-child td { border-bottom: none; }
+.metricGood { color: var(--color-success); }
+.metricWarn { color: var(--color-warning); }
+.metricBad  { color: var(--color-coral-dark); }
+.metricsNote {
+  font-size: 0.72rem;
+  color: var(--color-gray-400);
+  margin-top: var(--space-md);
+  line-height: 1.6;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-gray-100);
+}
+
+/* Limitations */
+.limitCard {
+  background: #FFF8F8;
+  border-color: rgba(238,106,95,0.2);
+}
+.limitList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+.limitList li {
+  font-size: 0.82rem;
+  color: var(--color-gray-600);
+  padding-left: var(--space-lg);
+  position: relative;
+  line-height: 1.6;
+}
+.limitList li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: var(--color-coral);
+}
+.limitCta {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-coral-dark);
+  padding-top: var(--space-md);
+  border-top: 1px solid rgba(238,106,95,0.15);
+}
+
+/* Heatmap */
+.heatmapHeader { display: flex; justify-content: space-between; align-items: center; }
+.toggleBtn {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-teal);
+  background: rgba(28,156,167,0.08);
+  border: 1px solid rgba(28,156,167,0.2);
+  border-radius: var(--radius-sm);
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.toggleBtn:hover { background: rgba(28,156,167,0.15); }
+.toggleActive { background: var(--color-teal) !important; color: white !important; }
+.heatmapWrap {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-gray-100);
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.heatmapImg {
+  width: 100%;
+  object-fit: contain;
+  max-height: 280px;
+  display: block;
+}
+.heatmapOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(238,106,95,0.35) 0%, rgba(245,166,35,0.2) 40%, rgba(28,156,167,0.15) 100%);
+  display: flex;
+  align-items: flex-end;
+  padding: var(--space-sm);
+  animation: fadeIn 0.3s ease;
+}
+.heatmapLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+  background: rgba(0,0,0,0.5);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.heatmapPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-gray-400);
+  font-size: 0.8rem;
+  padding: var(--space-2xl);
+}
+.heatmapNote {
+  font-size: 0.72rem;
+  color: var(--color-gray-400);
+  margin-top: var(--space-md);
+  font-style: italic;
+  line-height: 1.6;
+}
+
+/* Next Steps */
+.nextSteps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.nextStep {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  font-size: 0.875rem;
+  color: var(--color-gray-600);
+  line-height: 1.6;
+}
+.stepNum {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  background: var(--color-teal);
+  color: white;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+/* Clinician CTA */
+.clinicCard {
+  background: linear-gradient(135deg, var(--color-navy) 0%, var(--color-navy-mid) 100%);
+  border-color: var(--color-navy-light);
+}
+.clinicIcon { color: var(--color-teal-light); margin-bottom: var(--space-md); }
+.clinicTitle {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-white);
+  margin-bottom: var(--space-sm);
+}
+.clinicSub {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: var(--space-lg);
+  line-height: 1.6;
+}
+.insightsLink {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-teal-light);
+  text-decoration: none;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid rgba(28,156,167,0.3);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+.insightsLink:hover { background: rgba(28,156,167,0.1); color: var(--color-teal-light); }
+
+/* Loading */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  min-height: 50vh;
+  color: var(--color-gray-400);
+  font-size: 0.9rem;
+}
+.spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--color-gray-200);
+  border-top-color: var(--color-teal);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .pageHeader { flex-direction: column; }
+}

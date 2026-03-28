@@ -1,5 +1,8 @@
 import sys
-import os
+import json
+from pathlib import Path
+from typing import Any, Dict, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -7,16 +10,20 @@ import numpy as np
 import cv2
 from skimage.feature import local_binary_pattern, graycomatrix, graycoprops
 from PIL import Image, ImageEnhance, ImageFilter
+from torchvision import transforms
 
 # Configuration
-CONFIG = {
+CONFIG: Dict[str, Any] = {
     'img_size': (224, 224),
     'num_classes': 3,
     'class_names': ['Normal', 'Osteopenia', 'Osteoporosis'],
     'lbp_radius': 3,
     'lbp_n_points': 24,
     'glcm_distances': [1, 3, 5],
-    'glcm_angles': [0, np.pi/4, np.pi/2, 3*np.pi/4]
+    'glcm_angles': [0, np.pi / 4, np.pi / 2, 3 * np.pi / 4],
+    'use_texture_features': True,
+    'apply_advanced_preprocessing': True,
+    'confidence_threshold': 0.8,
 }
 
 # --- Preprocessing ---
@@ -219,52 +226,198 @@ class HybridModel(nn.Module):
             return self.fusion(combined)
         return cnn_out
 
-def run_inference(image_path, model_path):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = HybridModel(use_texture=True).to(device)
-    state_dict = torch.load(model_path, map_location=device)
-    model.load_state_dict(state_dict)
-    model.eval()
-    
-    img = Image.open(image_path).convert('RGB')
+
+def _normalize_img_size(val: Any) -> Tuple[int, int]:
+    if isinstance(val, (list, tuple)) and len(val) == 2:
+        return int(val[0]), int(val[1])
+    return 224, 224
+
+
+def _merge_config(*configs: Dict[str, Any]) -> Dict[str, Any]:
+    merged: Dict[str, Any] = {}
+    for cfg in configs:
+        merged.update(cfg or {})
+    merged['img_size'] = _normalize_img_size(merged.get('img_size', CONFIG['img_size']))
+    if 'class_names' not in merged:
+        merged['class_names'] = CONFIG['class_names']
+    merged['num_classes'] = merged.get('num_classes', len(merged['class_names']))
+    merged['use_texture_features'] = merged.get('use_texture_features', True)
+    merged['confidence_threshold'] = merged.get('confidence_threshold', 0.8)
+    merged['apply_advanced_preprocessing'] = merged.get('apply_advanced_preprocessing', True)
+    return merged
+
+
+def _resolve_model_path(model_arg: str | None) -> Tuple[Path, Dict[str, Any]]:
+    search_dirs = []
+
+    if model_arg:
+        candidate = Path(model_arg)
+        if candidate.is_file():
+            return candidate, {}
+        if candidate.is_dir():
+            search_dirs.append(candidate)
+
+    # Prefer packaged deployment artifacts from notebook export
+    root = Path(__file__).resolve().parents[1]
+    search_dirs.append(root / 'Direct_Models' / 'models_improved')
+    search_dirs.append(root / 'models')
+
+    for base_dir in search_dirs:
+        if not base_dir.exists():
+            continue
+
+        config_path = base_dir / 'deployment_config.json'
+        cfg: Dict[str, Any] = {}
+        if config_path.exists():
+            with open(config_path, 'r') as f:
+                cfg = json.load(f)
+
+        # Candidate names ordered by specificity
+        names = [
+            cfg.get('main_model_only_state'),
+            'main_model_only_state.pth',
+            cfg.get('model_path'),
+            'deployment_checkpoint.pth',
+            'best_improved_model.pth',
+        ]
+
+        for name in names:
+            if not name:
+                continue
+            candidate = base_dir / name
+            if candidate.exists():
+                return candidate, cfg
+
+    raise FileNotFoundError('No model checkpoint found. Provide a path or place artifacts in Direct_Models/models_improved or models/.')
+
+
+def _extract_state_dict(checkpoint: Any) -> Dict[str, Any]:
+    if isinstance(checkpoint, dict):
+        if 'model_state_dict' in checkpoint:
+            return checkpoint['model_state_dict']
+        if 'state_dict' in checkpoint:
+            return checkpoint['state_dict']
+    return checkpoint
+
+
+def _build_transform(cfg: Dict[str, Any]):
+    return transforms.Compose([
+        transforms.Resize(cfg['img_size']),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+
+def _preprocess_image(img: Image.Image, cfg: Dict[str, Any]) -> Image.Image:
     prep = AdvancedPreprocessing()
-    # Preprocessing
-    img = prep.bilateral_filter(img)
-    img = prep.apply_clahe_lab(img)
-    img = prep.unsharp_mask(img, radius=2, amount=1.2)
-    img = prep.enhance_contrast(img)
-    
-    # Texture
-    texture_extractor = TextureFeatureExtractor()
-    texture_features = texture_extractor.extract_all_features(img)
-    texture_tensor = torch.FloatTensor(texture_features).unsqueeze(0).to(device)
-    
-    # CNN
-    img_cnn = img.resize(CONFIG['img_size'], Image.BILINEAR)
-    img_tensor = torch.from_numpy(np.array(img_cnn)).permute(2, 0, 1).float().unsqueeze(0).to(device) / 255.0
-    
-    with torch.no_grad():
-        output = model(img_tensor, texture_tensor)
-        probabilities = F.softmax(output, dim=1)
-        confidence, predicted = torch.max(probabilities, 1)
-        
-    prediction = CONFIG['class_names'][predicted.item()]
+    if cfg.get('apply_advanced_preprocessing', True):
+        img = prep.bilateral_filter(img)
+        img = prep.apply_clahe_lab(img)
+        img = prep.unsharp_mask(img, radius=2, amount=1.2)
+        img = prep.enhance_contrast(img)
+    return img
+
+
+def _get_risk_level(predicted_class: int, confidence: float, cfg: Dict[str, Any]) -> str:
+    threshold = cfg.get('confidence_threshold', 0.8)
+    if predicted_class == 0 and confidence >= threshold:
+        return 'low'
+    if predicted_class == 2:
+        return 'high'
+    return 'moderate'
+
+
+def _get_recommendation(risk_level: str, predicted_label: str) -> str:
+    if risk_level == 'low':
+        return (
+            f"Assessment: Imaging aligns with {predicted_label}.\n"
+            "Plan: Continue preventive lifestyle (weight-bearing exercise, nutrition).\n"
+            "Monitoring: Repeat DEXA/dental imaging in 18–24 months or earlier if risk factors change."
+        )
+    if risk_level == 'moderate':
+        return (
+            f"Assessment: Pattern indicates {predicted_label}.\n"
+            "Diagnostics: Schedule confirmatory DEXA within 3–6 months.\n"
+            "Management: Start supplementation + targeted exercise; consider pharmacologic prevention."
+        )
+    return (
+        f"Assessment: Severe fragility pattern ({predicted_label}).\n"
+        "Urgent Steps: Refer to endocrinology; order DEXA + VFA within 4 weeks.\n"
+        "Therapy: Initiate anti-resorptive/anabolic plan with close follow-up."
+    )
+
+
+def _compute_t_score(prediction: str, class_probs: Dict[str, float]) -> float:
     if prediction == 'Normal':
-        t_score = -0.5 + (probabilities[0][0].item() * 0.4)
-    elif prediction == 'Osteopenia':
-        t_score = -1.8 + (probabilities[0][1].item() * 0.6)
+        return -0.5 + (class_probs.get('Normal', 0.0) * 0.4)
+    if prediction == 'Osteopenia':
+        return -1.8 + (class_probs.get('Osteopenia', 0.0) * 0.6)
+    return -3.2 + (class_probs.get('Osteoporosis', 0.0) * 0.4)
+
+def run_inference(image_path: str, model_arg: str | None = None) -> Dict[str, Any]:
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    checkpoint_path, cfg_from_disk = _resolve_model_path(model_arg)
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    cfg = _merge_config(CONFIG, cfg_from_disk, checkpoint.get('config', {}) if isinstance(checkpoint, dict) else {})
+
+    use_texture = bool(cfg.get('use_texture_features', True))
+    if use_texture:
+        model = HybridModel(num_classes=cfg['num_classes'], use_texture=True).to(device)
     else:
-        t_score = -3.2 + (probabilities[0][2].item() * 0.4)
-        
-    return {'prediction': prediction, 'confidence': confidence.item(),'t_score': round(t_score, 2), 'probabilities': probabilities[0].tolist()}
+        model = ImprovedCNN(num_classes=cfg['num_classes']).to(device)
+
+    state_dict = _extract_state_dict(checkpoint)
+    model.load_state_dict(state_dict, strict=False)
+    model.eval()
+
+    img = Image.open(image_path).convert('RGB')
+    img = _preprocess_image(img, cfg)
+
+    transform = _build_transform(cfg)
+    img_tensor = transform(img).unsqueeze(0).to(device)
+
+    texture_tensor = None
+    if use_texture:
+        texture_features = TextureFeatureExtractor().extract_all_features(img)
+        texture_tensor = torch.tensor(texture_features, dtype=torch.float32).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        logits = model(img_tensor, texture_tensor) if use_texture else model(img_tensor)
+        probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+
+    prob_dict = {cls: float(probs[i]) for i, cls in enumerate(cfg['class_names'])}
+    confidence = float(np.max(probs))
+    predicted_class = int(np.argmax(probs))
+    predicted_label = cfg['class_names'][predicted_class]
+
+    risk_level = _get_risk_level(predicted_class, confidence, cfg)
+    recommendation = _get_recommendation(risk_level, predicted_label)
+    t_score = round(_compute_t_score(predicted_label, prob_dict), 2)
+
+    return {
+        'prediction': predicted_label,
+        'predicted_label': predicted_label,
+        'predicted_class': predicted_class,
+        'confidence': confidence,
+        'probabilities': prob_dict,
+        'risk_level': risk_level,
+        'recommendation': recommendation,
+        't_score': t_score,
+        'model_path': str(checkpoint_path),
+        'config_used': cfg,
+        'texture_used': use_texture,
+    }
+
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python inference.py <image_path> <model_path>")
+    if len(sys.argv) < 2:
+        print("Usage: python inference.py <image_path> [model_dir_or_file]")
         sys.exit(1)
     try:
-        res = run_inference(sys.argv[1], sys.argv[2])
-        print(f"RESULT:{res}")
+        model_arg = sys.argv[2] if len(sys.argv) > 2 else None
+        res = run_inference(sys.argv[1], model_arg)
+        print(f"RESULT:{json.dumps(res)}")
     except Exception as e:
         import traceback
         print(f"ERROR:{str(e)}\n{traceback.format_exc()}")

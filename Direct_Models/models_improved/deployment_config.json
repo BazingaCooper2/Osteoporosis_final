@@ -1,0 +1,13 @@
+{
+    "class_names": [
+        "Normal",
+        "Osteopenia",
+        "Osteoporosis"
+    ],
+    "img_size": [
+        224,
+        224
+    ],
+    "main_model_only_path": "main_model_only.pkl",
+    "main_model_only_state": "main_model_only_state.pth"
+}

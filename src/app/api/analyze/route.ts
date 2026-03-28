@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
 import { writeFile, unlink } from 'fs/promises';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,13 +12,20 @@ const RISK_LEVEL_MAP: Record<string, 'low' | 'moderate' | 'high'> = {
   'Osteoporosis': 'high'
 };
 
+const DEFAULT_MODEL_DIR = join(process.cwd(), 'Direct_Models', 'models_improved');
+const FALLBACK_MODEL_DIR = join(process.cwd(), 'models');
+
 async function runPythonInference(imagePath: string): Promise<any> {
-  const modelPath = join(process.cwd(), 'models', 'best_improved_model.pth');
   const scriptPath = join(process.cwd(), 'scripts', 'inference.py');
+  const defaultPython = join(process.cwd(), '.venv', 'bin', 'python');
+  const pythonExecutable = process.env.PYTHON_BIN || (existsSync(defaultPython) ? defaultPython : 'python3');
+
+  const resolvedModelDir = process.env.MODEL_DIR || (existsSync(DEFAULT_MODEL_DIR) ? DEFAULT_MODEL_DIR : FALLBACK_MODEL_DIR);
 
   return new Promise((resolve, reject) => {
     // Note: ensure 'python3' is in your PATH or specify full path
-    const pythonProcess = spawn('python3', [scriptPath, imagePath, modelPath]);
+    // Prefer the project venv's interpreter to guarantee the right deps, fallback to system python3.
+    const pythonProcess = spawn(pythonExecutable, [scriptPath, imagePath, resolvedModelDir]);
     
     let output = '';
     let errorOutput = '';
@@ -36,11 +44,10 @@ async function runPythonInference(imagePath: string): Promise<any> {
         return reject(new Error(`Python process exited with code ${code}`));
       }
 
-      const match = output.match(/RESULT:(\{.*\})/);
+      const match = output.match(/RESULT:({[\s\S]*})/);
       if (match) {
         try {
-          const resultStr = match[1].replace(/'/g, '"'); // Convert single quotes to double quotes for JSON parsing
-          resolve(JSON.parse(resultStr));
+          resolve(JSON.parse(match[1]));
         } catch (e) {
           reject(new Error('Failed to parse Python output: ' + e));
         }
@@ -110,23 +117,37 @@ export async function POST(request: NextRequest) {
     await unlink(tempFilePath);
     tempFilePath = null;
 
-    const riskLevel = RISK_LEVEL_MAP[rawResult.prediction] || 'low';
-    const meta = getInterpretations(riskLevel, rawResult.t_score);
+    const riskLevelFromPy = typeof rawResult?.risk_level === 'string' ? rawResult.risk_level.toLowerCase() : undefined;
+    const riskLevel = (riskLevelFromPy as 'low' | 'moderate' | 'high' | undefined) || RISK_LEVEL_MAP[rawResult?.prediction] || 'low';
+
+    const confidence = typeof rawResult?.confidence === 'number' ? rawResult.confidence : Number(rawResult?.confidence ?? 0);
+    const whoClassification = rawResult?.predicted_label || rawResult?.prediction || 'Normal';
+    const tScore = typeof rawResult?.t_score === 'number' ? rawResult.t_score : Number(rawResult?.t_score ?? 0);
+
+    const recText = typeof rawResult?.recommendation === 'string' ? rawResult.recommendation : '';
+    const recLines = recText.split(/\n+/).map((s: string) => s.trim()).filter(Boolean);
+
+    const meta = getInterpretations(riskLevel, tScore);
+    const interpretation = recLines[0] || meta.interpretation;
+    const nextSteps = recLines.length > 1 ? recLines.slice(1) : meta.nextSteps;
+
+    const modelVersion = rawResult?.config_used?.pipeline_version || rawResult?.config_used?.model_version || '2.0.0-integrated';
+    const bmdEstimate = parseFloat((0.85 - (tScore * -0.1)).toFixed(3));
 
     const translatedResult = {
       risk_level: riskLevel,
-      confidence: rawResult.confidence,
+      confidence,
       metrics: {
-        t_score: rawResult.t_score,
-        bmd_estimate_gcm2: parseFloat((0.85 - (rawResult.t_score * -0.1)).toFixed(3)),
-        who_classification: rawResult.prediction,
-        model_version: '2.0.0-integrated',
-        scan_quality: 'Acceptable',
+        t_score: tScore,
+        bmd_estimate_gcm2: bmdEstimate,
+        who_classification: whoClassification,
+        model_version: modelVersion,
+        scan_quality: rawResult?.scan_quality || 'Acceptable',
       },
-      interpretation: meta.interpretation,
-      next_steps: meta.nextSteps,
-      heatmap_url: null,
-      processed_at: new Date().toISOString(),
+      interpretation,
+      next_steps: nextSteps,
+      heatmap_url: rawResult?.heatmap_url || null,
+      processed_at: rawResult?.processed_at || new Date().toISOString(),
     };
 
     return NextResponse.json(translatedResult, {

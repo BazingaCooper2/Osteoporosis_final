@@ -226,9 +226,6 @@ Osteoporosis_final/
 │       ├── conformal_prediction_analysis.png  Prediction set size distributions
 │       ├── preprocessing_comparison.png  Pipeline stage visualisation
 │       └── texture_features_comparison.png  LBP/GLCM distributions by class
-├── comparative_analysis.md             Comparison with Bhat & Shanthi (IEEE Access, 2026)
-├── comparative_analysis_paper2.md      Comparison with Singh et al. (IEEE RMKMATE, 2025)
-├── research_paper.md                   Full IEEE-style research manuscript
 └── README.md                           This file
 ```
 
